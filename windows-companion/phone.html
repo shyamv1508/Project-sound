@@ -34,6 +34,7 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
   document.querySelector("#title").textContent = label;
   document.querySelector("#channel").textContent = label;
   let context, socket, nextTime = 0, received = 0;
+  const scheduled = [];
 
   async function connect() {
     button.disabled = true;
@@ -63,11 +64,28 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
           for (let i = 0; i < frames; i++) mono[i] = samples[i * 2 + index];
           buffer.copyToChannel(mono, 0);
         }
+        const now = context.currentTime;
+        // Keep only a small playback cushion. If Wi-Fi/browser buffering builds up,
+        // cancel future scheduled chunks instead of letting latency grow indefinitely.
+        for (let i = scheduled.length - 1; i >= 0; i--) {
+          if (scheduled[i].endTime <= now) scheduled.splice(i, 1);
+        }
+        if (nextTime > now + 0.15) {
+          for (let i = scheduled.length - 1; i >= 0; i--) {
+            if (scheduled[i].startTime > now + 0.01) {
+              try { scheduled[i].source.stop(); } catch (_) {}
+              scheduled.splice(i, 1);
+            }
+          }
+          nextTime = now + 0.03;
+        }
+        if (nextTime < now + 0.02) nextTime = now + 0.03;
         const source = context.createBufferSource();
         source.buffer = buffer;
         source.connect(context.destination);
-        if (nextTime < context.currentTime + 0.08) nextTime = context.currentTime + 0.12;
-        source.start(nextTime);
+        const startTime = nextTime;
+        source.start(startTime);
+        scheduled.push({source, startTime, endTime: startTime + buffer.duration});
         nextTime += buffer.duration;
         received++;
         if (received % 20 === 0) status.textContent = "Playing laptop system audio · " + label;
