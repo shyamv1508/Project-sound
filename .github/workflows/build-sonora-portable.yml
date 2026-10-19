@@ -1,0 +1,103 @@
+name: Build Sonora Portable for Windows
+
+on:
+  push:
+    branches:
+      - system-audio-prototype
+    paths:
+      - "windows-companion/**"
+      - ".github/workflows/build-sonora-portable.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-portable:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
+      - name: Install dependencies and packager
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r windows-companion/requirements.txt pyinstaller
+
+      - name: Build standalone executable
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --console --name Sonora --collect-all soundcard --collect-all aiohttp --collect-all numpy windows-companion/sonora_companion.py
+
+      - name: Assemble portable folder
+        shell: pwsh
+        run: |
+          $package = Join-Path $env:GITHUB_WORKSPACE "Sonora-Portable"
+          New-Item -ItemType Directory -Force -Path $package | Out-Null
+          Copy-Item "dist/Sonora.exe" "$package/Sonora.exe"
+          Copy-Item "windows-companion/phone.html" "$package/phone.html"
+          @'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          title Sonora - Windows Audio Receiver
+          if not exist "%~dp0Sonora.exe" (
+            echo ERROR: Sonora.exe is missing. Extract the entire ZIP folder first.
+            pause
+            exit /b 1
+          )
+          echo Starting Sonora Portable...
+          echo Connect your phone to the same trusted private Wi-Fi network.
+          echo Type START in the Sonora console when you want to begin audio capture.
+          echo Press Ctrl+C to stop.
+          echo.
+          "%~dp0Sonora.exe"
+          echo.
+          echo Sonora has stopped.
+          pause
+          '@ | Set-Content -Encoding Ascii "$package/Start-Sonora.bat"
+          @'
+          SONORA PORTABLE FOR WINDOWS
+          ===========================
+
+          QUICK START
+          1. Extract the entire ZIP file to a normal folder (do not run it from inside the ZIP).
+          2. Double-click Start-Sonora.bat.
+          3. Read the console and type START only when you intend to stream system audio.
+          4. Connect your Android phone(s) to the same trusted private Wi-Fi network as this PC.
+          5. Open the single phone link printed in the console and tap "Connect and play audio".
+          6. Use the page's selector to choose Stereo, Left, Right, or Mono.
+
+          No separate Python installation or pip install is needed.
+          Keep Sonora.exe, phone.html, and Start-Sonora.bat together in the extracted folder.
+          The pairing PIN is saved as sonora_pairing.key next to Sonora.exe after first launch.
+          Do not share that key file if you want a different pairing PIN for each person.
+          If the laptop's local IP address changes, the printed phone link may change too.
+
+          SAFETY AND PRIVACY
+          - Use only a trusted private Wi-Fi network. Do not use public Wi-Fi or port-forward port 8765.
+          - Anyone with the pairing link may be able to listen while Sonora is running.
+          - Audio is streamed over the local network and is not intentionally saved by Sonora.
+          - If Windows Firewall prompts, allow access only on trusted Private networks.
+          - Stop streaming with Ctrl+C in the Sonora console.
+
+          TROUBLESHOOTING
+          - If the phone cannot connect, check both devices are on the same Wi-Fi and allow Sonora on the Private network.
+          - If audio is missing, check the Windows default output device and restart Sonora.
+          - Keep the browser page open and prevent the phone from sleeping.
+          - Windows SmartScreen or antivirus may warn about an unsigned, community-built executable. Only run it if you trust the source and have reviewed the project.
+          '@ | Set-Content -Encoding UTF8 "$package/README.txt"
+          Compress-Archive -Path "$package/*" -DestinationPath "$env:GITHUB_WORKSPACE/Sonora-Portable-Windows.zip" -Force
+
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sonora-Portable-Windows
+          path: Sonora-Portable-Windows.zip
+          if-no-files-found: error
+          retention-days: 30
