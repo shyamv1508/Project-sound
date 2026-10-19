@@ -160,7 +160,7 @@ def main():
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
     ip = get_lan_ip()
-    print("\\nPhone link (open on either phone; choose audio inside the page): http://" + ip + ":" + str(PORT) + "/phone?pin=" + PIN)
+    print("\nPhone link (open on either phone; choose audio inside the page): http://" + ip + ":" + str(PORT) + "/phone?pin=" + PIN)
     print("Keep this window open. Press Ctrl+C to stop.")
     print("Use only a trusted private network; do not share the pairing links.")
     web.run_app(app, host="0.0.0.0", port=PORT, print=None)
