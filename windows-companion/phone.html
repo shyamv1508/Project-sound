@@ -35,11 +35,12 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
   const channelLabel = value => ({L:"Left", R:"Right", STEREO:"Stereo (Left + Right)", MONO:"Mono (combined)"}[value] || "Stereo");
   const status = document.querySelector("#status");
   const button = document.querySelector("#start");
-  document.querySelector("#title").textContent = label;
+  document.querySelector("#title").textContent = "Phone speaker";
   let context, socket, nextTime = 0, received = 0;
   const scheduled = [];
 
   async function connect() {
+    if (socket && socket.readyState === WebSocket.OPEN) return;
     button.disabled = true;
     status.textContent = "Starting audio…";
     try {
@@ -113,6 +114,6 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
       status.textContent = "Selected " + channelLabel(channel) + ". Tap Connect and play audio.";
     }
   });
-  button.addEventListener("click", connect, {once:true});
+  button.addEventListener("click", connect);
 })();
 </script></body></html>
