@@ -17,7 +17,9 @@ FRAMES = 1024
 ROOT = Path(__file__).resolve().parent
 PIN = secrets.token_urlsafe(5)
 CLIENTS = set()
+CLIENT_QUEUES = {}
 CLIENTS_LOCK = threading.Lock()
+QUEUE_CHUNKS = 3
 STOP = threading.Event()
 LOOP = None
 CAPTURE_THREAD = None
@@ -34,12 +36,29 @@ def get_lan_ip():
         sock.close()
 
 
-async def send_chunk(client, payload):
-    if not client.closed:
+def queue_audio(client, payload):
+    """Run on the asyncio loop; discard stale unsent chunks to bound latency."""
+    queue = CLIENT_QUEUES.get(client)
+    if queue is None or client.closed:
+        return
+    if queue.full():
         try:
-            await client.send_bytes(payload)
-        except (ConnectionError, RuntimeError):
+            queue.get_nowait()
+        except asyncio.QueueEmpty:
             pass
+    try:
+        queue.put_nowait(payload)
+    except asyncio.QueueFull:
+        pass
+
+
+async def sender_loop(client, queue):
+    try:
+        while not client.closed:
+            payload = await queue.get()
+            await client.send_bytes(payload)
+    except (ConnectionError, RuntimeError, asyncio.CancelledError):
+        pass
 
 
 def capture_loopback():
@@ -67,7 +86,9 @@ def capture_loopback():
                     continue
                 payload = np.ascontiguousarray(audio[:, :2], dtype="<f4").tobytes()
                 for client in clients:
-                    asyncio.run_coroutine_threadsafe(send_chunk(client, payload), LOOP)
+                    # Queue insertion is handled on the event loop; each client
+                    # has a tiny bounded queue so slow receivers cannot build seconds of lag.
+                    LOOP.call_soon_threadsafe(queue_audio, client, payload)
     except Exception as exc:
         print("Audio capture stopped: " + str(exc))
         print("Check the Windows output device, then restart the companion.")
@@ -85,13 +106,18 @@ async def audio_socket(request):
         raise web.HTTPBadRequest(text="Invalid channel.")
     ws = web.WebSocketResponse(heartbeat=20, max_msg_size=1024)
     await ws.prepare(request)
+    queue = asyncio.Queue(maxsize=QUEUE_CHUNKS)
+    CLIENT_QUEUES[ws] = queue
     with CLIENTS_LOCK:
         CLIENTS.add(ws)
+    sender_task = asyncio.create_task(sender_loop(ws, queue))
     print("Receiver connected (" + channel + "). Active: " + str(len(CLIENTS)))
     try:
         async for _ in ws:
             pass
     finally:
+        CLIENT_QUEUES.pop(ws, None)
+        sender_task.cancel()
         with CLIENTS_LOCK:
             CLIENTS.discard(ws)
         print("Receiver disconnected. Active: " + str(len(CLIENTS)))
