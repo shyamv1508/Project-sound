@@ -101,8 +101,8 @@ async def phone_page(request):
 async def audio_socket(request):
     if request.query.get("pin", "") != PIN:
         raise web.HTTPForbidden(text="Pairing code is incorrect.")
-    channel = request.query.get("channel", "L").upper()
-    if channel not in ("L", "R", "STEREO"):
+    channel = request.query.get("channel", "STEREO").upper()
+    if channel not in ("L", "R", "STEREO", "MONO"):
         raise web.HTTPBadRequest(text="Invalid channel.")
     ws = web.WebSocketResponse(heartbeat=20, max_msg_size=1024)
     await ws.prepare(request)
