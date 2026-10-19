@@ -70,16 +70,16 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
         for (let i = scheduled.length - 1; i >= 0; i--) {
           if (scheduled[i].endTime <= now) scheduled.splice(i, 1);
         }
-        if (nextTime > now + 0.15) {
+        if (nextTime > now + 0.08) {
           for (let i = scheduled.length - 1; i >= 0; i--) {
             if (scheduled[i].startTime > now + 0.01) {
               try { scheduled[i].source.stop(); } catch (_) {}
               scheduled.splice(i, 1);
             }
           }
-          nextTime = now + 0.03;
+          nextTime = now + 0.02;
         }
-        if (nextTime < now + 0.02) nextTime = now + 0.03;
+        if (nextTime < now + 0.01) nextTime = now + 0.02;
         const source = context.createBufferSource();
         source.buffer = buffer;
         source.connect(context.destination);
