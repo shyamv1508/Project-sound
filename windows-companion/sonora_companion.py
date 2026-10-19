@@ -48,7 +48,13 @@ def capture_loopback():
         if speaker is None:
             print("No default Windows playback device found.")
             return
-        with speaker.recorder(samplerate=RATE, channels=2, blocksize=FRAMES) as recorder:
+        # SoundCard captures Windows loopback through a loopback microphone,
+        # not through the speaker object itself.
+        loopback = sc.get_microphone(id=str(speaker.name), include_loopback=True)
+        if loopback is None:
+            print("Could not find a loopback capture device for: " + speaker.name)
+            return
+        with loopback.recorder(samplerate=RATE, channels=2, blocksize=FRAMES) as recorder:
             print("Capturing system audio from: " + speaker.name)
             while not STOP.is_set():
                 with CLIENTS_LOCK:
