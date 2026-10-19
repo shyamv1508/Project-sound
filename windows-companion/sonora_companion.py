@@ -14,7 +14,7 @@ from aiohttp import web
 PORT = 8765
 RATE = 48000
 FRAMES = 1024
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 PIN_FILE = ROOT / "sonora_pairing.key"
 
 def load_or_create_pin():
