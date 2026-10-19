@@ -13,7 +13,7 @@ from aiohttp import web
 
 PORT = 8765
 RATE = 48000
-FRAMES = 2048
+FRAMES = 1024
 ROOT = Path(__file__).resolve().parent
 PIN = secrets.token_urlsafe(5)
 CLIENTS = set()
