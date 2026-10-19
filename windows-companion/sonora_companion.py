@@ -27,7 +27,7 @@ def load_or_create_pin():
         pass
     saved = secrets.token_urlsafe(5)
     try:
-        PIN_FILE.write_text(saved + "\\n", encoding="utf-8")
+        PIN_FILE.write_text(saved + "\n", encoding="utf-8")
     except OSError as exc:
         print("Warning: could not save pairing PIN; the link may change next run:", exc)
     return saved
