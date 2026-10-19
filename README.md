@@ -1,38 +1,39 @@
-# Phone Surround — prototype 0.1
+# Sonora — Windows System Audio Companion
 
-A browser-only starter for experimenting with a Windows laptop plus two Android phones as extra sound sources.
+Sonora streams a Windows laptop's system audio to Android phones on the same trusted private Wi-Fi network. Each phone opens one link and can select Stereo, Left, Right, or Mono.
 
-## Included in this milestone
-- Responsive controller page.
-- Unique receiver links for two phones.
-- User-tap audio enablement via Web Audio API.
-- A scheduled test tone on each receiver using the same target timestamp.
-- Vite + React setup and Vercel SPA rewrite configuration.
+## Run it without installing Python
 
-## Important limitations
-- This is a scheduled-tone test, not sample-accurate synchronization. Each phone has its own clock, audio hardware, and browser scheduling jitter.
-- It does not stream live Windows/system/browser audio.
-- It does not extract Netflix, YouTube, or other 5.1 channels.
-- A website cannot silently capture all Windows system audio. Tab/screen audio capture requires explicit user permission and browser support.
-- Protected streaming services may block capture or return muted/black output.
-- True discrete surround may require a Windows audio-routing helper or a multichannel output path, which is outside the website-only constraint.
+1. Open the [Build Sonora Portable for Windows workflow](https://github.com/shyamv1508/Project-sound/actions/workflows/build-sonora-portable.yml).
+2. Open the latest successful run on the `system-audio-prototype` branch.
+3. Under **Artifacts**, download **Sonora-Portable-Windows**.
+4. Extract the ZIP to a normal folder.
+5. Double-click `Start-Sonora.bat`, type `START` in the console, and open the printed phone link on your phone.
+6. Keep the laptop and phone(s) on the same trusted private Wi-Fi network.
 
-## Run locally
-Install Node.js, then:
+The portable build is for **64-bit Windows 10/11 laptops**. It does not require a separate Python installation. The first run may trigger Windows Firewall or SmartScreen warnings; only allow private-network access if you trust the source.
 
-```bash
-npm install
-npm run dev
+## Build
+
+GitHub Actions builds `Sonora.exe` from the source in `windows-companion/` and publishes a downloadable ZIP artifact. A new build is triggered by changes to that folder or the workflow file. You can also start a build manually from the Actions page using **Run workflow**.
+
+## Run from source
+
+Requires 64-bit Windows 10/11 and Python 3.11 or newer:
+
+```powershell
+cd windows-companion
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python sonora_companion.py
 ```
 
-Open the local URL on the laptop. For phone testing, the dev server is configured to listen on the LAN; phones must be able to reach the laptop's local IP and port. For easiest testing, deploy to HTTPS first.
+Type `START` only when you intend to stream system audio.
 
-## Deploy on Vercel
-1. Create a GitHub repository named `project-sound` (GitHub repository names use hyphens rather than spaces).
-2. Upload/push the project files to the repository root.
-3. In Vercel, select **Add New → Project**, import the GitHub repository, and deploy.
-4. Framework preset: Vite. Build command: `npm run build`; output directory: `dist`.
-5. Subsequent pushes to the connected branch trigger deployments automatically.
+## Safety and limitations
 
-## Next milestone
-Add a signaling service and WebRTC audio transport for a user-selected, non-DRM test source. Browser tab capture can be explored with explicit user permission. Reliable independent 5.1 channel routing from arbitrary browser playback is not guaranteed by a website alone.
+- Use only a trusted private Wi-Fi network. Do not use public Wi-Fi or port-forward port 8765.
+- Anyone with the pairing link may be able to listen while Sonora is running; do not share it.
+- Audio is streamed over the local network and is not intentionally saved.
+- This prototype captures the default Windows playback device. It does not guarantee synchronized surround sound across phones.
