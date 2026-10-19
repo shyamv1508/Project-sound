@@ -15,7 +15,24 @@ PORT = 8765
 RATE = 48000
 FRAMES = 1024
 ROOT = Path(__file__).resolve().parent
-PIN = secrets.token_urlsafe(5)
+PIN_FILE = ROOT / "sonora_pairing.key"
+
+def load_or_create_pin():
+    """Keep the same pairing PIN across companion restarts."""
+    try:
+        saved = PIN_FILE.read_text(encoding="utf-8").strip()
+        if saved:
+            return saved
+    except OSError:
+        pass
+    saved = secrets.token_urlsafe(5)
+    try:
+        PIN_FILE.write_text(saved + "\\n", encoding="utf-8")
+    except OSError as exc:
+        print("Warning: could not save pairing PIN; the link may change next run:", exc)
+    return saved
+
+PIN = load_or_create_pin()
 CLIENTS = set()
 CLIENT_QUEUES = {}
 CLIENTS_LOCK = threading.Lock()
