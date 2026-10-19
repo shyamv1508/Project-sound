@@ -13,13 +13,13 @@ from aiohttp import web
 
 PORT = 8765
 RATE = 48000
-FRAMES = 512
+FRAMES = 1024
 ROOT = Path(__file__).resolve().parent
 PIN = secrets.token_urlsafe(5)
 CLIENTS = set()
 CLIENT_QUEUES = {}
 CLIENTS_LOCK = threading.Lock()
-QUEUE_CHUNKS = 2
+QUEUE_CHUNKS = 4
 STOP = threading.Event()
 LOOP = None
 CAPTURE_THREAD = None
