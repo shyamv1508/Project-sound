@@ -20,12 +20,13 @@ CLIENTS = set()
 CLIENTS_LOCK = threading.Lock()
 STOP = threading.Event()
 LOOP = None
+CAPTURE_THREAD = None
 
 
 def get_lan_ip():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.connect(("192.0.2.1", 80))  # local route lookup; no application data sent
+        sock.connect(("192.0.2.1", 80))
         return sock.getsockname()[0]
     except OSError:
         return "127.0.0.1"
@@ -96,8 +97,20 @@ async def status(request):
                               "receivers": len(CLIENTS), "audio_saved": False})
 
 
+async def on_startup(app):
+    global LOOP, CAPTURE_THREAD
+    LOOP = asyncio.get_running_loop()
+    CAPTURE_THREAD = threading.Thread(target=capture_loopback, name="sonora-loopback", daemon=True)
+    CAPTURE_THREAD.start()
+
+
+async def on_shutdown(app):
+    STOP.set()
+    if CAPTURE_THREAD:
+        await asyncio.to_thread(CAPTURE_THREAD.join, 2)
+
+
 def main():
-    global LOOP
     if sys.platform != "win32":
         print("This prototype is for Windows 10/11.")
         return 1
@@ -107,28 +120,19 @@ def main():
         print("No audio was captured.")
         return 0
 
-    LOOP = asyncio.new_event_loop()
-    asyncio.set_event_loop(LOOP)
-    thread = threading.Thread(target=capture_loopback, name="sonora-loopback", daemon=True)
-    thread.start()
     app = web.Application()
     app.router.add_get("/", phone_page)
     app.router.add_get("/phone", phone_page)
     app.router.add_get("/audio", audio_socket)
     app.router.add_get("/status", status)
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
     ip = get_lan_ip()
     print("\nLeft phone:  http://" + ip + ":" + str(PORT) + "/phone?channel=L&pin=" + PIN)
     print("Right phone: http://" + ip + ":" + str(PORT) + "/phone?channel=R&pin=" + PIN)
     print("Keep this window open. Press Ctrl+C to stop.")
     print("Use only a trusted private network; do not share the pairing links.")
-    try:
-        web.run_app(app, host="0.0.0.0", port=PORT, print=None)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        STOP.set()
-        thread.join(timeout=2)
-        LOOP.close()
+    web.run_app(app, host="0.0.0.0", port=PORT, print=None)
     return 0
 
 
