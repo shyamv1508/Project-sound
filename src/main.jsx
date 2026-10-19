@@ -102,17 +102,20 @@ function Controller() {
   const [copied, setCopied] = useState('');
   const [laptopStatus, setLaptopStatus] = useState('Laptop test tone is ready');
 
-  async function testLaptop(side) {
+  async function testLaptopStereo() {
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) throw new Error('Web Audio is not supported in this browser.');
       const context = new AudioContextClass();
       await context.resume();
-      playTone(context, context.currentTime + 0.05, hz, volume, side === 'left' ? -1 : 1);
-      setLaptopStatus(`Playing on laptop ${side} output — assigned as ${side === 'left' ? laptopLeftRole : laptopRightRole}`);
-      window.setTimeout(() => context.close().catch(() => {}), 1200);
+      const now = context.currentTime + 0.12;
+      // Pan each tone to the corresponding side of the laptop's default stereo output.
+      playTone(context, now, hz, volume, -1, 0.45);
+      playTone(context, now + 0.8, hz, volume, 1, 0.45);
+      setLaptopStatus(`Automatic stereo test: left channel (${laptopLeftRole}), then right channel (${laptopRightRole})`);
+      window.setTimeout(() => context.close().catch(() => {}), 1800);
     } catch (error) {
-      setLaptopStatus(error.message || 'Could not play laptop test tone.');
+      setLaptopStatus(error.message || 'Could not play laptop stereo test.');
     }
   }
 
@@ -157,16 +160,15 @@ function Controller() {
 
     <section className="panel">
       <div className="panel-heading"><div><div className="eyebrow">CUSTOMIZE YOUR SETUP</div><h2>Speaker assignments</h2></div><span className="step">01 / 03</span></div>
-      <p className="muted">Assign logical surround roles to each device. These labels customize your layout; a normal laptop headphone/speaker output is still stereo, not a true multichannel Windows device.</p>
+      <p className="muted">The app automatically sends left-channel test audio to the laptop's left stereo channel and right-channel test audio to its right stereo channel. Choose the logical role you want each side to represent; you do not need to select separate physical speakers in Windows.</p>
       <div className="controls">
         <label>Phone 1 channel<select value={leftRole} onChange={e => setLeftRole(e.target.value)}>{roleOptions.filter(x => x !== rightRole).map(x => <option key={x}>{x}</option>)}</select></label>
         <label>Phone 2 channel<select value={rightRole} onChange={e => setRightRole(e.target.value)}>{roleOptions.filter(x => x !== leftRole).map(x => <option key={x}>{x}</option>)}</select></label>
-        <label>Laptop physical left output<select value={laptopLeftRole} onChange={e => setLaptopLeftRole(e.target.value)}>{roleOptions.filter(x => x !== laptopRightRole).map(x => <option key={x}>{x}</option>)}</select></label>
-        <label>Laptop physical right output<select value={laptopRightRole} onChange={e => setLaptopRightRole(e.target.value)}>{roleOptions.filter(x => x !== laptopLeftRole).map(x => <option key={x}>{x}</option>)}</select></label>
+        <label>Laptop left stereo channel role<select value={laptopLeftRole} onChange={e => setLaptopLeftRole(e.target.value)}>{roleOptions.filter(x => x !== laptopRightRole).map(x => <option key={x}>{x}</option>)}</select></label>
+        <label>Laptop right stereo channel role<select value={laptopRightRole} onChange={e => setLaptopRightRole(e.target.value)}>{roleOptions.filter(x => x !== laptopLeftRole).map(x => <option key={x}>{x}</option>)}</select></label>
       </div>
       <div className="button-row">
-        <button className="secondary" onClick={() => testLaptop('left')}>Test laptop left</button>
-        <button className="secondary" onClick={() => testLaptop('right')}>Test laptop right</button>
+        <button className="primary" onClick={testLaptopStereo}>Run automatic left → right test</button>
       </div>
       <p className="inline-status">{laptopStatus}</p>
     </section>
@@ -186,8 +188,8 @@ function Controller() {
     </section>
 
     <section className="limits">
-      <div className="limit"><span className="limit-icon">✓</span><div><b>Now included</b><p>Custom logical channel labels for both phones and both laptop stereo sides, separate left/right laptop tone tests, adjustable tone frequency and volume, and scheduled phone test tones.</p></div></div>
-      <div className="limit"><span className="limit-icon warning">!</span><div><b>Important limitation</b><p>Changing a label does not physically turn a stereo laptop speaker into a discrete rear/center/subwoofer output. The left/right test buttons check stereo separation. True 5.1 routing and live movie-audio streaming are still future milestones.</p></div></div>
+      <div className="limit"><span className="limit-icon">✓</span><div><b>Now included</b><p>Custom logical channel labels for both phones and laptop stereo sides, automatic left-then-right laptop channel test, adjustable tone frequency and volume, and scheduled phone test tones.</p></div></div>
+      <div className="limit"><span className="limit-icon warning">!</span><div><b>Important limitation</b><p>The automatic test pans tones to the laptop's left and right stereo channels. A channel-role label is still a logical assignment: it cannot turn the laptop's built-in stereo speakers into extra physical surround speakers. Routing actual Netflix/Windows audio to phones or separate surround channels is still a future milestone.</p></div></div>
       <div className="limit"><span className="limit-icon warning">!</span><div><b>Browser and DRM limitations</b><p>A website cannot silently capture all Windows system audio. Tab/screen capture requires user permission and browser support; protected services such as Netflix may block capture or return muted audio.</p></div></div>
     </section>
     <footer>PHONE SURROUND · Experimental browser-only prototype · Test tones only; no audio is uploaded</footer>
