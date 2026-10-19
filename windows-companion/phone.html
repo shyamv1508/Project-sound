@@ -10,7 +10,7 @@ main{width:min(440px,100%);padding:26px;border:1px solid #29313e;border-radius:2
 .brand{font-size:12px;letter-spacing:.16em;color:#a8f2d0;font-weight:800}
 h1{font-size:32px;letter-spacing:-.05em;margin:24px 0 8px}.muted{color:#9ba6b7;font-size:13px;line-height:1.7}
 .pill{display:inline-block;border:1px solid #344239;border-radius:100px;padding:7px 10px;font-size:11px;color:#a8f2d0}
-button{width:100%;margin-top:18px;border:0;border-radius:10px;background:#a8f2d0;color:#0b1913;font-weight:800;padding:14px;cursor:pointer;font-size:14px}
+select{width:100%;margin-top:10px;border:1px solid #344239;border-radius:10px;background:#0c1118;color:#f4f6fb;padding:13px;font-size:14px}label{display:block;margin-top:20px;font-size:12px;color:#a8b2c2}button{width:100%;margin-top:18px;border:0;border-radius:10px;background:#a8f2d0;color:#0b1913;font-weight:800;padding:14px;cursor:pointer;font-size:14px}
 .status{margin-top:15px;padding:13px;border-radius:10px;background:#0c1118;border:1px solid #29313e;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
 small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
 </style></head>
@@ -18,7 +18,9 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
 <div class="brand">SONORA · LOCAL RECEIVER</div>
 <h1 id="title">Phone speaker</h1>
 <p class="muted">Receives your Windows laptop's system audio over your local Wi-Fi network.</p>
-<span class="pill" id="channel">Channel</span>
+<span class="pill">ONE LINK · SELECT AUDIO HERE</span>
+<label for="channelSelect">Audio output</label>
+<select id="channelSelect"><option value="STEREO">Stereo (Left + Right)</option><option value="L">Left</option><option value="R">Right</option><option value="MONO">Mono (combine Left + Right)</option></select>
 <button id="start">Connect and play audio</button>
 <div class="status" id="status" role="status">Not connected. Tap the button to begin.</div>
 <small>Keep this page open and prevent the phone from sleeping. Connect only to a laptop you trust. Audio is streamed locally and is not saved by this prototype.</small>
@@ -26,13 +28,14 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
 <script>
 (() => {
   const params = new URLSearchParams(location.search);
-  const channel = (params.get("channel") || "L").toUpperCase();
+  let channel = (params.get("channel") || "STEREO").toUpperCase();
+  const channelSelect = document.querySelector("#channelSelect");
+  if ([...channelSelect.options].some(option => option.value === channel)) channelSelect.value = channel;
   const pin = params.get("pin") || "";
-  const label = channel === "R" ? "Right channel" : channel === "STEREO" ? "Stereo" : "Left channel";
+  const channelLabel = value => ({L:"Left", R:"Right", STEREO:"Stereo (Left + Right)", MONO:"Mono (combined)"}[value] || "Stereo");
   const status = document.querySelector("#status");
   const button = document.querySelector("#start");
   document.querySelector("#title").textContent = label;
-  document.querySelector("#channel").textContent = label;
   let context, socket, nextTime = 0, received = 0;
   const scheduled = [];
 
@@ -44,7 +47,7 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
       if (!AudioContextClass) throw new Error("This browser does not support Web Audio.");
       context = new AudioContextClass({latencyHint:"interactive"});
       await context.resume();
-      socket = new WebSocket("ws://" + location.host + "/audio?pin=" + encodeURIComponent(pin) + "&channel=" + channel);
+      socket = new WebSocket("ws://" + location.host + "/audio?pin=" + encodeURIComponent(pin) + "&channel=STEREO");
       socket.binaryType = "arraybuffer";
       socket.onopen = () => { status.textContent = "Connected. Waiting for laptop audio…"; button.textContent = "Connected"; };
       socket.onmessage = event => {
@@ -60,8 +63,13 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
           buffer.copyToChannel(left, 0); buffer.copyToChannel(right, 1);
         } else {
           buffer = context.createBuffer(1, frames, 48000);
-          const mono = new Float32Array(frames), index = channel === "R" ? 1 : 0;
-          for (let i = 0; i < frames; i++) mono[i] = samples[i * 2 + index];
+          const mono = new Float32Array(frames);
+          if (channel === "MONO") {
+            for (let i = 0; i < frames; i++) mono[i] = (samples[i * 2] + samples[i * 2 + 1]) * 0.5;
+          } else {
+            const index = channel === "R" ? 1 : 0;
+            for (let i = 0; i < frames; i++) mono[i] = samples[i * 2 + index];
+          }
           buffer.copyToChannel(mono, 0);
         }
         const now = context.currentTime;
@@ -88,7 +96,7 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
         scheduled.push({source, startTime, endTime: startTime + buffer.duration});
         nextTime += buffer.duration;
         received++;
-        if (received % 20 === 0) status.textContent = "Playing laptop system audio · " + label;
+        if (received % 20 === 0) status.textContent = "Playing laptop system audio · " + channelLabel(channel);
       };
       socket.onerror = () => { status.textContent = "Could not connect. Check the pairing link and that the laptop companion is running."; button.disabled = false; };
       socket.onclose = () => { status.textContent = "Disconnected. Restart the companion and reconnect."; button.disabled = false; };
@@ -97,6 +105,14 @@ small{display:block;color:#8894a7;margin-top:18px;line-height:1.7}
       button.disabled = false;
     }
   }
+  channelSelect.addEventListener("change", () => {
+    channel = channelSelect.value;
+    if (context && socket && socket.readyState === WebSocket.OPEN) {
+      status.textContent = "Switched to " + channelLabel(channel) + ". Playing audio…";
+    } else {
+      status.textContent = "Selected " + channelLabel(channel) + ". Tap Connect and play audio.";
+    }
+  });
   button.addEventListener("click", connect, {once:true});
 })();
 </script></body></html>
